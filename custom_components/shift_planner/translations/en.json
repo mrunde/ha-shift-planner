@@ -1,0 +1,22 @@
+{
+  "title": "Shift Planner",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Shift Planner",
+        "description": "Choose the local calendar for your shifts.",
+        "data": {
+          "calendar": "Local calendar"
+        }
+      }
+    },
+    "error": {
+      "not_local_calendar": "Select an entity from the Local Calendar integration.",
+      "unavailable": "The calendar is unavailable.",
+      "not_writable": "The calendar does not support creating events."
+    },
+    "abort": {
+      "already_configured": "This calendar already has a Shift Planner."
+    }
+  }
+}

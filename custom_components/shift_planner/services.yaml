@@ -1,0 +1,25 @@
+create_shift:
+  name: Create shift
+  description: Create a shift only if the selected day has no calendar events.
+  fields:
+    config_entry_id:
+      name: Shift Planner
+      required: true
+      selector:
+        config_entry:
+          integration: shift_planner
+    date:
+      name: Date
+      required: true
+      selector:
+        date: {}
+    shift:
+      name: Shift
+      required: true
+      selector:
+        select:
+          options:
+            - "Frühschicht"
+            - "11:00"
+            - "12:00"
+            - "Spätschicht"
