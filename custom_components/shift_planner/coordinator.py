@@ -10,7 +10,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_CALENDAR, DOMAIN, DURATION_MINUTES, SHIFTS
+from .const import CONF_CALENDAR, CONF_SHIFTS, DEFAULT_SHIFTS, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,6 +72,10 @@ class ShiftCoordinator(DataUpdateCoordinator[PlannerData]):
             if registered is not None
             else self.entry.data[CONF_CALENDAR]
         )
+
+    @property
+    def shifts(self) -> dict[str, dict[str, str]]:
+        return self.entry.options.get(CONF_SHIFTS, DEFAULT_SHIFTS)
 
     async def _events(
         self,
@@ -154,6 +158,10 @@ class ShiftCoordinator(DataUpdateCoordinator[PlannerData]):
         async with self.lock:
             first = monday()
 
+            shift_config = self.shifts.get(shift)
+            if shift_config is None:
+                raise ServiceValidationError(f"Unknown shift: {shift}")
+
             if not first <= day < first + timedelta(days=14):
                 raise ServiceValidationError(
                     "The date must be in the current week or next week"
@@ -172,9 +180,16 @@ class ShiftCoordinator(DataUpdateCoordinator[PlannerData]):
 
             start = datetime.combine(
                 day,
-                time.fromisoformat(SHIFTS[shift]["start"]),
+                time.fromisoformat(shift_config["start"]),
                 tzinfo=dt_util.DEFAULT_TIME_ZONE,
             )
+            end = datetime.combine(
+                day,
+                time.fromisoformat(shift_config["end"]),
+                tzinfo=dt_util.DEFAULT_TIME_ZONE,
+            )
+            if end <= start:
+                end += timedelta(days=1)
 
             await self.hass.services.async_call(
                 "calendar",
@@ -183,9 +198,7 @@ class ShiftCoordinator(DataUpdateCoordinator[PlannerData]):
                     "entity_id": self.calendar,
                     "summary": shift,
                     "start_date_time": start.isoformat(),
-                    "end_date_time": (
-                        start + timedelta(minutes=DURATION_MINUTES)
-                    ).isoformat(),
+                    "end_date_time": end.isoformat(),
                 },
                 blocking=True,
                 context=context,

@@ -15,11 +15,7 @@ create_shift:
         date: {}
     shift:
       name: Shift
+      description: Name of a shift configured for the selected Shift Planner.
       required: true
       selector:
-        select:
-          options:
-            - "Frühschicht"
-            - "11:00"
-            - "12:00"
-            - "Spätschicht"
+        text: {}

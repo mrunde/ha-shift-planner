@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ServiceValidationError, Unauthorized
 from homeassistant.helpers import config_validation as cv
 
-from .const import DOMAIN, SHIFTS
+from .const import DOMAIN
 from .coordinator import ShiftCoordinator
 
 
@@ -54,6 +54,6 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 cv.string,
                 vol.Match(r"^\d{4}-\d{2}-\d{2}$"),
             ),
-            vol.Required("shift"): vol.In(SHIFTS),
+            vol.Required("shift"): cv.string,
         }),
     )

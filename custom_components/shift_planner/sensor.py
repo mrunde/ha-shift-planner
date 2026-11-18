@@ -3,7 +3,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, SHIFTS
+from .const import DOMAIN
 from .coordinator import ShiftCoordinator
 
 
@@ -14,7 +14,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 
 class ShiftSensor(CoordinatorEntity[ShiftCoordinator], SensorEntity):
-    _attr_name = "Dienstplan"
+    _attr_name = "Shift Plan"
     _attr_icon = "mdi:calendar-clock"
 
     def __init__(self, coordinator: ShiftCoordinator) -> None:
@@ -55,6 +55,6 @@ class ShiftSensor(CoordinatorEntity[ShiftCoordinator], SensorEntity):
             "calendar": self.coordinator.calendar,
             "shifts": [
                 {"id": key, **value}
-                for key, value in SHIFTS.items()
+                for key, value in self.coordinator.shifts.items()
             ],
         }

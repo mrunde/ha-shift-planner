@@ -7,6 +7,54 @@
         "description": "Choose the local calendar for your shifts.",
         "data": {
           "calendar": "Local calendar"
+        },
+        "options": {
+          "step": {
+            "init": {
+              "title": "Manage shifts",
+              "description": "Add, edit, or remove a shift.",
+              "menu_options": {
+                "add": "Add shift",
+                "edit": "Edit shift",
+                "remove": "Remove shift"
+              }
+            },
+            "add": {
+              "title": "Add shift",
+              "description": "An end time before the start time means the shift ends the next day.",
+              "data": {
+                "name": "Name",
+                "start": "Start time",
+                "end": "End time"
+              }
+            },
+            "edit": {
+              "title": "Choose a shift to edit",
+              "data": {
+                "shift": "Shift"
+              }
+            },
+            "edit_shift": {
+              "title": "Edit shift",
+              "description": "An end time before the start time means the shift ends the next day.",
+              "data": {
+                "name": "Name",
+                "start": "Start time",
+                "end": "End time"
+              }
+            },
+            "remove": {
+              "title": "Choose a shift to remove",
+              "data": {
+                "shift": "Shift"
+              }
+            }
+          },
+          "error": {
+            "empty_name": "Enter a name for the shift.",
+            "duplicate_name": "A shift with this name already exists.",
+            "same_time": "Start and end times must be different."
+          }
         }
       }
     },

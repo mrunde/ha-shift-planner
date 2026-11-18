@@ -7,6 +7,54 @@
         "description": "Wähle den lokalen Kalender für die Schichten.",
         "data": {
           "calendar": "Lokaler Kalender"
+        },
+        "options": {
+          "step": {
+            "init": {
+              "title": "Schichten verwalten",
+              "description": "Eine Schicht hinzufügen, bearbeiten oder entfernen.",
+              "menu_options": {
+                "add": "Schicht hinzufügen",
+                "edit": "Schicht bearbeiten",
+                "remove": "Schicht entfernen"
+              }
+            },
+            "add": {
+              "title": "Schicht hinzufügen",
+              "description": "Liegt die Endzeit vor der Startzeit, endet die Schicht am nächsten Tag.",
+              "data": {
+                "name": "Name",
+                "start": "Startzeit",
+                "end": "Endzeit"
+              }
+            },
+            "edit": {
+              "title": "Schicht zum Bearbeiten auswählen",
+              "data": {
+                "shift": "Schicht"
+              }
+            },
+            "edit_shift": {
+              "title": "Schicht bearbeiten",
+              "description": "Liegt die Endzeit vor der Startzeit, endet die Schicht am nächsten Tag.",
+              "data": {
+                "name": "Name",
+                "start": "Startzeit",
+                "end": "Endzeit"
+              }
+            },
+            "remove": {
+              "title": "Schicht zum Entfernen auswählen",
+              "data": {
+                "shift": "Schicht"
+              }
+            }
+          },
+          "error": {
+            "empty_name": "Gib einen Namen für die Schicht ein.",
+            "duplicate_name": "Eine Schicht mit diesem Namen existiert bereits.",
+            "same_time": "Start- und Endzeit müssen unterschiedlich sein."
+          }
         }
       }
     },
