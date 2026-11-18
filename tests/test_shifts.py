@@ -152,6 +152,13 @@ class TestShiftCreation(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(self.patch_timezone.stop)
 
     async def test_default_and_overnight_times(self):
+        self.assertEqual(list(self.coordinator.shifts), [
+            "Early",
+            "11:00",
+            "12:00",
+            "Late",
+        ])
+
         await self.coordinator.async_create_shift(self.today, "Early", None)
         data = self.hass.services.async_call.await_args.args[2]
         self.assertEqual(data["start_date_time"], "2026-11-18T06:30:00+00:00")
@@ -164,6 +171,29 @@ class TestShiftCreation(unittest.IsolatedAsyncioTestCase):
         data = self.hass.services.async_call.await_args.args[2]
         self.assertEqual(data["summary"], "Night")
         self.assertEqual(data["end_date_time"], "2026-11-19T06:00:00+00:00")
+
+    async def test_calendar_shifts_are_returned_by_start_time(self):
+        self.coordinator._events = AsyncMock(return_value=[
+            {
+                "start": "2026-11-18T14:00:00+00:00",
+                "end": "2026-11-18T22:30:00+00:00",
+                "summary": "Late",
+            },
+            {
+                "start": "2026-11-18T06:30:00+00:00",
+                "end": "2026-11-18T15:00:00+00:00",
+                "summary": "Early",
+            },
+            {
+                "start": "2026-11-18T11:00:00+00:00",
+                "end": "2026-11-18T19:30:00+00:00",
+                "summary": "Mid",
+            },
+        ])
+
+        data = await self.coordinator._async_update_data()
+
+        self.assertEqual(data["days"][2]["summaries"], ["Early", "Mid", "Late"])
 
     async def test_reject_unknown_shift_invalid_date_and_existing_event(self):
         with self.assertRaises(ServiceValidationError):

@@ -75,7 +75,13 @@ class ShiftCoordinator(DataUpdateCoordinator[PlannerData]):
 
     @property
     def shifts(self) -> dict[str, dict[str, str]]:
-        return self.entry.options.get(CONF_SHIFTS, DEFAULT_SHIFTS)
+        shifts = self.entry.options.get(CONF_SHIFTS, DEFAULT_SHIFTS)
+        return dict(
+            sorted(
+                shifts.items(),
+                key=lambda item: time.fromisoformat(item[1]["start"]),
+            )
+        )
 
     async def _events(
         self,
@@ -122,6 +128,7 @@ class ShiftCoordinator(DataUpdateCoordinator[PlannerData]):
                     )
                     for event in events
                 ]
+                intervals.sort(key=lambda interval: interval[0])
 
                 days: list[DayData] = []
 
