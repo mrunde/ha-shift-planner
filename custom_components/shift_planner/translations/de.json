@@ -3,58 +3,10 @@
   "config": {
     "step": {
       "user": {
-        "title": "Shift Planner",
-        "description": "Wähle den lokalen Kalender für die Schichten.",
+        "title": "Kalender für Shift Planner auswählen",
+        "description": "Wähle den lokalen Kalender, in dem Shift Planner Termine erstellen soll. Nach der Einrichtung kannst du die Schichtnamen und -zeiten unter „Konfigurieren“ verwalten.",
         "data": {
           "calendar": "Lokaler Kalender"
-        },
-        "options": {
-          "step": {
-            "init": {
-              "title": "Schichten verwalten",
-              "description": "Eine Schicht hinzufügen, bearbeiten oder entfernen.",
-              "menu_options": {
-                "add": "Schicht hinzufügen",
-                "edit": "Schicht bearbeiten",
-                "remove": "Schicht entfernen"
-              }
-            },
-            "add": {
-              "title": "Schicht hinzufügen",
-              "description": "Liegt die Endzeit vor der Startzeit, endet die Schicht am nächsten Tag.",
-              "data": {
-                "name": "Name",
-                "start": "Startzeit",
-                "end": "Endzeit"
-              }
-            },
-            "edit": {
-              "title": "Schicht zum Bearbeiten auswählen",
-              "data": {
-                "shift": "Schicht"
-              }
-            },
-            "edit_shift": {
-              "title": "Schicht bearbeiten",
-              "description": "Liegt die Endzeit vor der Startzeit, endet die Schicht am nächsten Tag.",
-              "data": {
-                "name": "Name",
-                "start": "Startzeit",
-                "end": "Endzeit"
-              }
-            },
-            "remove": {
-              "title": "Schicht zum Entfernen auswählen",
-              "data": {
-                "shift": "Schicht"
-              }
-            }
-          },
-          "error": {
-            "empty_name": "Gib einen Namen für die Schicht ein.",
-            "duplicate_name": "Eine Schicht mit diesem Namen existiert bereits.",
-            "same_time": "Start- und Endzeit müssen unterschiedlich sein."
-          }
         }
       }
     },
@@ -65,6 +17,64 @@
     },
     "abort": {
       "already_configured": "Dieser Kalender hat bereits einen Shift Planner."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Schichten verwalten",
+        "description": "Eingerichtete Schichten für diesen Kalender: **{shift_count}**. Wähle unten eine Aktion aus.",
+        "menu_options": {
+          "add": "Schicht hinzufügen",
+          "edit": "Schicht bearbeiten",
+          "remove": "Schicht entfernen"
+        },
+        "menu_option_descriptions": {
+          "add": "Lege eine Schicht mit eigenem Namen und eigenen Zeiten an.",
+          "edit": "Ändere den Namen oder die Zeiten einer bestehenden Schicht.",
+          "remove": "Entferne eine Schicht aus dem Planer, ohne Kalendertermine zu löschen."
+        }
+      },
+      "add": {
+        "title": "Schicht hinzufügen",
+        "description": "Gib der Schicht einen eindeutigen Namen und lege ihre Zeiten fest. Liegt die Endzeit vor der Startzeit, endet die Schicht am nächsten Tag.",
+        "submit": "Schicht hinzufügen",
+        "data": {
+          "name": "Schichtname",
+          "start": "Startzeit",
+          "end": "Endzeit"
+        }
+      },
+      "edit": {
+        "title": "Schicht zum Bearbeiten auswählen",
+        "description": "Wähle eine Schicht aus, um ihre aktuellen Einstellungen zu öffnen.",
+        "data": {
+          "shift": "Schicht"
+        }
+      },
+      "edit_shift": {
+        "title": "Schichtdetails bearbeiten",
+        "description": "Ändere den Namen oder die Zeiten für zukünftige Schichten. Bestehende Kalendertermine bleiben unverändert. Liegt die Endzeit vor der Startzeit, endet die Schicht am nächsten Tag.",
+        "submit": "Änderungen speichern",
+        "data": {
+          "name": "Schichtname",
+          "start": "Startzeit",
+          "end": "Endzeit"
+        }
+      },
+      "remove": {
+        "title": "Schicht entfernen",
+        "description": "Wähle die Schicht aus, die du aus dem Planer entfernen möchtest. Bestehende Kalendertermine werden nicht gelöscht.",
+        "submit": "Schicht entfernen",
+        "data": {
+          "shift": "Schicht"
+        }
+      }
+    },
+    "error": {
+      "empty_name": "Gib einen Namen für die Schicht ein.",
+      "duplicate_name": "Eine Schicht mit diesem Namen existiert bereits.",
+      "same_time": "Start- und Endzeit müssen unterschiedlich sein."
     }
   }
 }

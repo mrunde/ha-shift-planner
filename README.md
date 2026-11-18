@@ -10,8 +10,10 @@ to display and manage shifts from a Home Assistant dashboard.
 ## Configure shifts
 
 After adding the integration and selecting a writable Local Calendar, open
-**Settings > Devices & services > Shift Planner > Configure** to add, edit, or
-remove shifts. Each shift has a name, start time, and end time. An end time
+**Settings > Devices & services > Shift Planner > Configure** to see how many
+shifts are configured and choose **Add shift**, **Edit shift**, or **Remove
+shift**. When editing or removing a shift, the picker shows its name and hours.
+Each shift has a name, start time, and end time. An end time
 before the start time means the shift ends on the following day; the start and
 end times cannot be the same. Each calendar has its own shift configuration.
 

@@ -69,7 +69,11 @@ class ShiftPlannerOptionsFlow(config_entries.OptionsFlow):
         menu = ["add"]
         if self._shifts:
             menu.extend(["edit", "remove"])
-        return self.async_show_menu(step_id="init", menu_options=menu)
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=menu,
+            description_placeholders={"shift_count": str(len(self._shifts))},
+        )
 
     async def async_step_add(self, user_input=None):
         return self._shift_form("add", user_input)
@@ -91,13 +95,20 @@ class ShiftPlannerOptionsFlow(config_entries.OptionsFlow):
         return self._select_form("remove")
 
     def _select_form(self, step_id):
+        options = []
+        for name, shift in self._shifts.items():
+            start = time.fromisoformat(shift["start"]).isoformat().removesuffix(":00")
+            end = time.fromisoformat(shift["end"]).isoformat().removesuffix(":00")
+            options.append({"value": name, "label": f"{name} ({start} - {end})"})
+
         return self.async_show_form(
             step_id=step_id,
             data_schema=vol.Schema({
                 vol.Required("shift"): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=list(self._shifts))
+                    selector.SelectSelectorConfig(options=options)
                 ),
             }),
+            last_step=step_id == "remove",
         )
 
     def _shift_form(self, step_id, user_input, original=None):

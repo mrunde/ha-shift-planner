@@ -3,58 +3,10 @@
   "config": {
     "step": {
       "user": {
-        "title": "Shift Planner",
-        "description": "Choose the local calendar for your shifts.",
+        "title": "Choose a calendar for Shift Planner",
+        "description": "Choose the Local Calendar where Shift Planner will create events. You can manage shift names and times under Configure after setup.",
         "data": {
           "calendar": "Local calendar"
-        },
-        "options": {
-          "step": {
-            "init": {
-              "title": "Manage shifts",
-              "description": "Add, edit, or remove a shift.",
-              "menu_options": {
-                "add": "Add shift",
-                "edit": "Edit shift",
-                "remove": "Remove shift"
-              }
-            },
-            "add": {
-              "title": "Add shift",
-              "description": "An end time before the start time means the shift ends the next day.",
-              "data": {
-                "name": "Name",
-                "start": "Start time",
-                "end": "End time"
-              }
-            },
-            "edit": {
-              "title": "Choose a shift to edit",
-              "data": {
-                "shift": "Shift"
-              }
-            },
-            "edit_shift": {
-              "title": "Edit shift",
-              "description": "An end time before the start time means the shift ends the next day.",
-              "data": {
-                "name": "Name",
-                "start": "Start time",
-                "end": "End time"
-              }
-            },
-            "remove": {
-              "title": "Choose a shift to remove",
-              "data": {
-                "shift": "Shift"
-              }
-            }
-          },
-          "error": {
-            "empty_name": "Enter a name for the shift.",
-            "duplicate_name": "A shift with this name already exists.",
-            "same_time": "Start and end times must be different."
-          }
         }
       }
     },
@@ -65,6 +17,64 @@
     },
     "abort": {
       "already_configured": "This calendar already has a Shift Planner."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Manage shifts",
+        "description": "Configured shifts for this calendar: **{shift_count}**. Choose what you want to do below.",
+        "menu_options": {
+          "add": "Add shift",
+          "edit": "Edit shift",
+          "remove": "Remove shift"
+        },
+        "menu_option_descriptions": {
+          "add": "Create a shift with its own name and hours.",
+          "edit": "Change the name or hours of an existing shift.",
+          "remove": "Remove a shift from the planner without deleting calendar events."
+        }
+      },
+      "add": {
+        "title": "Add a shift",
+        "description": "Give the shift a unique name and set its hours. If the end time is earlier than the start time, the shift ends the next day.",
+        "submit": "Add shift",
+        "data": {
+          "name": "Shift name",
+          "start": "Start time",
+          "end": "End time"
+        }
+      },
+      "edit": {
+        "title": "Choose a shift to edit",
+        "description": "Select a shift to open its current settings.",
+        "data": {
+          "shift": "Shift"
+        }
+      },
+      "edit_shift": {
+        "title": "Edit shift details",
+        "description": "Update the name or hours for future shifts. Events already in the calendar will not change. If the end time is earlier than the start time, the shift ends the next day.",
+        "submit": "Save changes",
+        "data": {
+          "name": "Shift name",
+          "start": "Start time",
+          "end": "End time"
+        }
+      },
+      "remove": {
+        "title": "Remove a shift",
+        "description": "Select the shift to remove from the planner. Events already in the calendar will not be deleted.",
+        "submit": "Remove shift",
+        "data": {
+          "shift": "Shift"
+        }
+      }
+    },
+    "error": {
+      "empty_name": "Enter a name for the shift.",
+      "duplicate_name": "A shift with this name already exists.",
+      "same_time": "Start and end times must be different."
     }
   }
 }

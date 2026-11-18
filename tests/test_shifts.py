@@ -1,5 +1,7 @@
 import asyncio
 from datetime import date, timezone
+import json
+from pathlib import Path
 from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -27,10 +29,12 @@ class TestOptionsFlow(unittest.IsolatedAsyncioTestCase):
         self.flow.async_create_entry = lambda **kwargs: kwargs
 
     async def test_add_edit_and_remove(self):
+        menu = await self.flow.async_step_init()
         self.assertEqual(
-            (await self.flow.async_step_init())["menu_options"],
+            menu["menu_options"],
             ["add", "edit", "remove"],
         )
+        self.assertEqual(menu["description_placeholders"]["shift_count"], "4")
         result = await self.flow.async_step_add(
             {"name": " Night ", "start": "22:00:00", "end": "06:00:00"}
         )
@@ -41,16 +45,61 @@ class TestOptionsFlow(unittest.IsolatedAsyncioTestCase):
         result = await self.flow.async_step_edit({"shift": "Night"})
         self.assertEqual(result["step_id"], "edit_shift")
         result = await self.flow.async_step_edit_shift(
-            {"name": "Late", "start": "21:00:00", "end": "05:00:00"}
+            {"name": "Late Night", "start": "21:00:00", "end": "05:00:00"}
         )
         self.entry.options = result["data"]
         self.assertNotIn("Night", self.entry.options["shifts"])
-        self.assertEqual(self.entry.options["shifts"]["Late"]["start"], "21:00:00")
+        self.assertEqual(self.entry.options["shifts"]["Late Night"]["start"], "21:00:00")
 
-        result = await self.flow.async_step_remove({"shift": "Late"})
-        self.assertNotIn("Late", result["data"]["shifts"])
+        result = await self.flow.async_step_remove({"shift": "Late Night"})
+        self.assertNotIn("Late Night", result["data"]["shifts"])
         self.entry.options = {"shifts": {}}
-        self.assertEqual((await self.flow.async_step_init())["menu_options"], ["add"])
+        menu = await self.flow.async_step_init()
+        self.assertEqual(menu["menu_options"], ["add"])
+        self.assertEqual(menu["description_placeholders"]["shift_count"], "0")
+
+    async def test_shift_picker_shows_hours_without_changing_value(self):
+        self.entry.options = {
+            "shifts": {"Night": {"label": "Night", "start": "22:00:00", "end": "06:00"}}
+        }
+        for step, last_step in (("edit", False), ("remove", True)):
+            with self.subTest(step=step):
+                result = await getattr(self.flow, f"async_step_{step}")()
+                self.assertEqual(result["last_step"], last_step)
+                schema = result["data_schema"]
+                shift_selector = next(iter(schema.schema.values()))
+                self.assertEqual(
+                    shift_selector.config["options"],
+                    [{"value": "Night", "label": "Night (22:00 - 06:00)"}],
+                )
+                self.assertEqual(schema({"shift": "Night"}), {"shift": "Night"})
+
+    async def test_options_translations_cover_menu_and_forms(self):
+        translations_dir = (
+            Path(__file__).resolve().parents[1]
+            / "custom_components"
+            / "shift_planner"
+            / "translations"
+        )
+        menu = await self.flow.async_step_init()
+        for language in ("en", "de"):
+            with self.subTest(language=language):
+                translations = json.loads(
+                    (translations_dir / f"{language}.json").read_text(encoding="utf-8")
+                )
+                options = translations["options"]
+                steps = options["step"]
+                init = steps[menu["step_id"]]
+                self.assertTrue(init["title"].strip())
+                self.assertIn("{shift_count}", init["description"])
+                for action in menu["menu_options"]:
+                    self.assertTrue(init["menu_options"][action].strip())
+                    self.assertTrue(init["menu_option_descriptions"][action].strip())
+                for step in ("add", "edit", "edit_shift", "remove"):
+                    self.assertTrue(steps[step]["title"].strip())
+                    self.assertTrue(steps[step]["description"].strip())
+                for error in ("empty_name", "duplicate_name", "same_time"):
+                    self.assertTrue(options["error"][error].strip())
 
     async def test_validation(self):
         cases = [
@@ -64,6 +113,11 @@ class TestOptionsFlow(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(result["errors"][field], error)
 
     async def test_edit_preserves_legacy_label(self):
+        self.entry.options = {
+            "shifts": {
+                "Frühschicht": {"label": "Früh", "start": "07:00", "end": "15:30"}
+            }
+        }
         await self.flow.async_step_edit({"shift": "Frühschicht"})
         result = await self.flow.async_step_edit_shift(
             {"name": "Frühschicht", "start": "06:00", "end": "14:30"}
@@ -98,10 +152,10 @@ class TestShiftCreation(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(self.patch_timezone.stop)
 
     async def test_default_and_overnight_times(self):
-        await self.coordinator.async_create_shift(self.today, "Frühschicht", None)
+        await self.coordinator.async_create_shift(self.today, "Early", None)
         data = self.hass.services.async_call.await_args.args[2]
-        self.assertEqual(data["start_date_time"], "2026-11-18T07:00:00+00:00")
-        self.assertEqual(data["end_date_time"], "2026-11-18T15:30:00+00:00")
+        self.assertEqual(data["start_date_time"], "2026-11-18T06:30:00+00:00")
+        self.assertEqual(data["end_date_time"], "2026-11-18T15:00:00+00:00")
 
         self.entry.options = {
             "shifts": {"Night": {"label": "Night", "start": "22:00", "end": "06:00"}}
