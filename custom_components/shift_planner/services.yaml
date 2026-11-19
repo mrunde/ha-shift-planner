@@ -19,3 +19,36 @@ create_shift:
       required: true
       selector:
         text: {}
+
+delete_old_events:
+  name: Delete old events
+  description: Permanently delete all calendar events starting before this Monday at 00:00 in Home Assistant's timezone. Events starting this week or in the future are kept.
+  fields:
+    config_entry_id:
+      name: Shift Planner
+      required: true
+      selector:
+        config_entry:
+          integration: shift_planner
+
+update_shift:
+  name: Update shift
+  description: Change the name and hours of the only calendar event on the selected day. Select the date on which the event starts.
+  fields:
+    config_entry_id:
+      name: Shift Planner
+      required: true
+      selector:
+        config_entry:
+          integration: shift_planner
+    date:
+      name: Date
+      required: true
+      selector:
+        date: {}
+    shift:
+      name: Shift
+      description: Name of the configured shift to change the event to.
+      required: true
+      selector:
+        text: {}

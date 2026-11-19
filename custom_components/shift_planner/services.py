@@ -13,7 +13,7 @@ from .coordinator import ShiftCoordinator
 
 @callback
 def async_setup_services(hass: HomeAssistant) -> None:
-    async def create_shift(call: ServiceCall) -> None:
+    async def handle_shift(call: ServiceCall) -> None:
         coordinator: ShiftCoordinator | None = hass.data[DOMAIN].get(
             call.data["config_entry_id"]
         )
@@ -31,6 +31,10 @@ def async_setup_services(hass: HomeAssistant) -> None:
             ):
                 raise Unauthorized(entity_id=coordinator.calendar)
 
+        if call.service == "delete_old_events":
+            await coordinator.async_delete_old_events(call.context)
+            return
+
         try:
             day = date.fromisoformat(call.data["date"])
         except ValueError as err:
@@ -38,22 +42,34 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 "Use a date in YYYY-MM-DD format"
             ) from err
 
-        await coordinator.async_create_shift(
+        action = (
+            coordinator.async_update_shift
+            if call.service == "update_shift"
+            else coordinator.async_create_shift
+        )
+        await action(
             day,
             call.data["shift"],
             call.context,
         )
 
+    schema = vol.Schema({
+        vol.Required("config_entry_id"): cv.string,
+        vol.Required("date"): vol.All(
+            cv.string,
+            vol.Match(r"^\d{4}-\d{2}-\d{2}$"),
+        ),
+        vol.Required("shift"): cv.string,
+    })
+    for service in ("create_shift", "update_shift"):
+        hass.services.async_register(
+            DOMAIN, service, handle_shift, schema=schema
+        )
     hass.services.async_register(
         DOMAIN,
-        "create_shift",
-        create_shift,
+        "delete_old_events",
+        handle_shift,
         schema=vol.Schema({
             vol.Required("config_entry_id"): cv.string,
-            vol.Required("date"): vol.All(
-                cv.string,
-                vol.Match(r"^\d{4}-\d{2}-\d{2}$"),
-            ),
-            vol.Required("shift"): cv.string,
         }),
     )

@@ -3,6 +3,8 @@ from datetime import date, datetime, time, timedelta
 import logging
 from typing import Any, TypedDict
 
+from homeassistant.components.calendar import CalendarEntity, CalendarEntityFeature
+from homeassistant.components.calendar.const import DATA_COMPONENT
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Context, HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -156,6 +158,48 @@ class ShiftCoordinator(DataUpdateCoordinator[PlannerData]):
                 f"Cannot read the shift calendar: {err}"
             ) from err
 
+    def _shift_times(self, day: date, shift: str) -> tuple[datetime, datetime]:
+        first = monday()
+        shift_config = self.shifts.get(shift)
+        if shift_config is None:
+            raise ServiceValidationError(f"Unknown shift: {shift}")
+
+        if not first <= day < first + timedelta(days=14):
+            raise ServiceValidationError(
+                "The date must be in the current week or next week"
+            )
+
+        start = datetime.combine(
+            day,
+            time.fromisoformat(shift_config["start"]),
+            tzinfo=dt_util.DEFAULT_TIME_ZONE,
+        )
+        end = datetime.combine(
+            day,
+            time.fromisoformat(shift_config["end"]),
+            tzinfo=dt_util.DEFAULT_TIME_ZONE,
+        )
+        if end <= start:
+            end += timedelta(days=1)
+        return start, end
+
+    def _calendar_entity(
+        self, feature: CalendarEntityFeature, action: str
+    ) -> CalendarEntity:
+        state = self.hass.states.get(self.calendar)
+        if state is None or state.state in ("unknown", "unavailable"):
+            raise HomeAssistantError("The calendar is unavailable")
+
+        component = self.hass.data.get(DATA_COMPONENT)
+        entity = component.get_entity(self.calendar) if component else None
+        if entity is None:
+            raise HomeAssistantError("The calendar is not loaded")
+        if not (entity.supported_features and entity.supported_features & feature):
+            raise ServiceValidationError(
+                f"The calendar does not support {action} events"
+            )
+        return entity
+
     async def async_create_shift(
         self,
         day: date,
@@ -163,16 +207,7 @@ class ShiftCoordinator(DataUpdateCoordinator[PlannerData]):
         context: Context,
     ) -> None:
         async with self.lock:
-            first = monday()
-
-            shift_config = self.shifts.get(shift)
-            if shift_config is None:
-                raise ServiceValidationError(f"Unknown shift: {shift}")
-
-            if not first <= day < first + timedelta(days=14):
-                raise ServiceValidationError(
-                    "The date must be in the current week or next week"
-                )
+            start, end = self._shift_times(day, shift)
 
             events = await self._events(
                 midnight(day),
@@ -184,19 +219,6 @@ class ShiftCoordinator(DataUpdateCoordinator[PlannerData]):
                 raise ServiceValidationError(
                     f"There is already an event on {day.isoformat()}"
                 )
-
-            start = datetime.combine(
-                day,
-                time.fromisoformat(shift_config["start"]),
-                tzinfo=dt_util.DEFAULT_TIME_ZONE,
-            )
-            end = datetime.combine(
-                day,
-                time.fromisoformat(shift_config["end"]),
-                tzinfo=dt_util.DEFAULT_TIME_ZONE,
-            )
-            if end <= start:
-                end += timedelta(days=1)
 
             await self.hass.services.async_call(
                 "calendar",
@@ -212,3 +234,94 @@ class ShiftCoordinator(DataUpdateCoordinator[PlannerData]):
             )
 
         await self.async_request_refresh()
+
+    async def async_update_shift(
+        self,
+        day: date,
+        shift: str,
+        context: Context,
+    ) -> None:
+        async with self.lock:
+            start, end = self._shift_times(day, shift)
+            entity = self._calendar_entity(
+                CalendarEntityFeature.UPDATE_EVENT, "updating"
+            )
+
+            # The get_events action omits the UID needed to update an event.
+            events = await entity.async_get_events(
+                self.hass, midnight(day), midnight(day + timedelta(days=1))
+            )
+            if len(events) != 1:
+                raise ServiceValidationError(
+                    "The selected day must have exactly one calendar event"
+                )
+
+            event = events[0]
+            if event.start_datetime_local.date() != day:
+                raise ServiceValidationError(
+                    "Select the date on which the event starts"
+                )
+            if not event.uid:
+                raise ServiceValidationError("The calendar event has no UID")
+
+            entity.async_set_context(context)
+            try:
+                await entity.async_update_event(
+                    event.uid,
+                    {
+                        "summary": shift,
+                        "dtstart": start,
+                        "dtend": end,
+                        "description": event.description,
+                        "location": event.location,
+                    },
+                    recurrence_id=event.recurrence_id,
+                )
+            except ValueError as err:
+                raise ServiceValidationError(
+                    f"Cannot update the calendar event: {err}"
+                ) from err
+
+        await self.async_request_refresh()
+
+    async def async_delete_old_events(self, context: Context) -> None:
+        deleted = 0
+        try:
+            async with self.lock:
+                entity = self._calendar_entity(
+                    CalendarEntityFeature.DELETE_EVENT, "deleting"
+                )
+                cutoff = midnight(monday())
+                start = midnight(date.min)
+                # Avoid UTC underflow in timezones east of Greenwich.
+                if (offset := start.utcoffset()) is not None and offset > timedelta(0):
+                    start += offset
+                events = await entity.async_get_events(self.hass, start, cutoff)
+                targets: list[tuple[str, str | None]] = []
+                for event in events:
+                    if event.start_datetime_local >= cutoff:
+                        continue
+                    if not event.uid:
+                        raise ServiceValidationError("A calendar event has no UID")
+                    if event.rrule and not event.recurrence_id:
+                        raise ServiceValidationError(
+                            "A recurring calendar event has no recurrence ID; "
+                            "cannot safely preserve current and future occurrences"
+                        )
+                    targets.append((event.uid, event.recurrence_id))
+
+                entity.async_set_context(context)
+                for uid, recurrence_id in targets:
+                    try:
+                        await entity.async_delete_event(
+                            uid, recurrence_id=recurrence_id
+                        )
+                    except (HomeAssistantError, ValueError) as err:
+                        raise HomeAssistantError(
+                            "Calendar cleanup stopped after deleting "
+                            f"{deleted} events: {err}"
+                        ) from err
+                    deleted += 1
+        finally:
+            if deleted:
+                await self.async_request_refresh()
