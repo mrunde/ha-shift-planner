@@ -44,18 +44,9 @@ data:
   shift: Late
 ```
 
-## Delete old calendar events
+## Automatic calendar cleanup
 
-Use `shift_planner.delete_old_events` to permanently delete **all events**
-in the selected planner's calendar whose start is before this Monday at 00:00
-in Home Assistant's timezone. This includes non-shift events and overnight
-events starting last week even if they end this week. Events starting this
-week (including Monday at exactly 00:00) and all future events remain.
-Only past occurrences of recurring events are deleted, not the whole series.
-Cleanup runs only when this action is called; it is not automatic.
-
-```yaml
-action: shift_planner.delete_old_events
-data:
-  config_entry_id: YOUR_CONFIG_ENTRY_ID
-```
+Shift Planner checks each configured calendar when the integration loads and
+daily at midnight in Home Assistant's timezone. It permanently deletes
+**all events** starting before this week's Monday at 00:00. Events
+starting this week or later stay in the calendar.

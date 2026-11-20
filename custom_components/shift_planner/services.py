@@ -31,10 +31,6 @@ def async_setup_services(hass: HomeAssistant) -> None:
             ):
                 raise Unauthorized(entity_id=coordinator.calendar)
 
-        if call.service == "delete_old_events":
-            await coordinator.async_delete_old_events(call.context)
-            return
-
         try:
             day = date.fromisoformat(call.data["date"])
         except ValueError as err:
@@ -65,11 +61,3 @@ def async_setup_services(hass: HomeAssistant) -> None:
         hass.services.async_register(
             DOMAIN, service, handle_shift, schema=schema
         )
-    hass.services.async_register(
-        DOMAIN,
-        "delete_old_events",
-        handle_shift,
-        schema=vol.Schema({
-            vol.Required("config_entry_id"): cv.string,
-        }),
-    )

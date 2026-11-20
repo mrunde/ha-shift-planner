@@ -6,9 +6,10 @@ from typing import Any, TypedDict
 from homeassistant.components.calendar import CalendarEntity, CalendarEntityFeature
 from homeassistant.components.calendar.const import DATA_COMPONENT
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import Context, HomeAssistant
+from homeassistant.core import Context, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -284,7 +285,32 @@ class ShiftCoordinator(DataUpdateCoordinator[PlannerData]):
 
         await self.async_request_refresh()
 
-    async def async_delete_old_events(self, context: Context) -> None:
+    @callback
+    def async_schedule_cleanup(self) -> None:
+        task: asyncio.Task[None] | None = None
+
+        @callback
+        def schedule_cleanup(now: datetime | None = None) -> None:
+            nonlocal task
+            if task is None or task.done():
+                task = self.entry.async_create_background_task(
+                    self.hass, self._async_run_cleanup(), "Shift Planner calendar cleanup"
+                )
+
+        self.entry.async_on_unload(
+            async_track_time_change(
+                self.hass, schedule_cleanup, hour=0, minute=0, second=0
+            )
+        )
+        schedule_cleanup()
+
+    async def _async_run_cleanup(self) -> None:
+        try:
+            await self._async_delete_old_events()
+        except (HomeAssistantError, ValueError) as err:
+            _LOGGER.warning("Cannot clean up %s: %s", self.calendar, err)
+
+    async def _async_delete_old_events(self) -> None:
         deleted = 0
         try:
             async with self.lock:
@@ -310,7 +336,8 @@ class ShiftCoordinator(DataUpdateCoordinator[PlannerData]):
                         )
                     targets.append((event.uid, event.recurrence_id))
 
-                entity.async_set_context(context)
+                if targets:
+                    entity.async_set_context(Context())
                 for uid, recurrence_id in targets:
                     try:
                         await entity.async_delete_event(
