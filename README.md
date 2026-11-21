@@ -44,6 +44,21 @@ data:
   shift: Late
 ```
 
+## Delete events
+
+Use `shift_planner.delete_events` to permanently delete all events starting on
+the selected date in Home Assistant's timezone, including all-day events.
+Events that started on an earlier day are not deleted, even if they overlap
+the selected date. For recurring events, only the selected occurrences are
+deleted. An empty day requires no changes.
+
+```yaml
+action: shift_planner.delete_events
+data:
+  config_entry_id: YOUR_CONFIG_ENTRY_ID
+  date: "2026-11-18"
+```
+
 ## Automatic calendar cleanup
 
 Shift Planner checks each configured calendar when the integration loads and

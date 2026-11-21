@@ -285,6 +285,48 @@ class ShiftCoordinator(DataUpdateCoordinator[PlannerData]):
 
         await self.async_request_refresh()
 
+    async def async_delete_events(self, day: date, context: Context) -> None:
+        if day == date.max:
+            raise ServiceValidationError("The selected date is out of range")
+
+        deleted = 0
+        try:
+            async with self.lock:
+                entity = self._calendar_entity(
+                    CalendarEntityFeature.DELETE_EVENT, "deleting"
+                )
+                events = await entity.async_get_events(
+                    self.hass, midnight(day), midnight(day + timedelta(days=1))
+                )
+                targets: list[tuple[str, str | None]] = []
+                for event in events:
+                    if event.start_datetime_local.date() != day:
+                        continue
+                    if not event.uid:
+                        raise ServiceValidationError("A calendar event has no UID")
+                    if event.rrule and not event.recurrence_id:
+                        raise ServiceValidationError(
+                            "A recurring calendar event has no recurrence ID; "
+                            "cannot safely preserve other occurrences"
+                        )
+                    targets.append((event.uid, event.recurrence_id))
+
+                if targets:
+                    entity.async_set_context(context)
+                for uid, recurrence_id in targets:
+                    try:
+                        await entity.async_delete_event(
+                            uid, recurrence_id=recurrence_id
+                        )
+                    except (HomeAssistantError, ValueError) as err:
+                        raise HomeAssistantError(
+                            f"Event deletion stopped after deleting {deleted} events: {err}"
+                        ) from err
+                    deleted += 1
+        finally:
+            if deleted:
+                await self.async_request_refresh()
+
     @callback
     def async_schedule_cleanup(self) -> None:
         task: asyncio.Task[None] | None = None

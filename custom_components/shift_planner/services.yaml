@@ -41,3 +41,19 @@ update_shift:
       required: true
       selector:
         text: {}
+
+delete_events:
+  name: Delete events
+  description: Permanently delete all calendar events that start on the selected day.
+  fields:
+    config_entry_id:
+      name: Shift Planner
+      required: true
+      selector:
+        config_entry:
+          integration: shift_planner
+    date:
+      name: Date
+      required: true
+      selector:
+        date: {}

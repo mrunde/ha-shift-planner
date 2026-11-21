@@ -38,26 +38,28 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 "Use a date in YYYY-MM-DD format"
             ) from err
 
-        action = (
-            coordinator.async_update_shift
-            if call.service == "update_shift"
-            else coordinator.async_create_shift
-        )
-        await action(
-            day,
-            call.data["shift"],
-            call.context,
-        )
+        if call.service == "delete_events":
+            await coordinator.async_delete_events(day, call.context)
+        else:
+            action = (
+                coordinator.async_update_shift
+                if call.service == "update_shift"
+                else coordinator.async_create_shift
+            )
+            await action(day, call.data["shift"], call.context)
 
-    schema = vol.Schema({
+    day_fields = {
         vol.Required("config_entry_id"): cv.string,
         vol.Required("date"): vol.All(
             cv.string,
             vol.Match(r"^\d{4}-\d{2}-\d{2}$"),
         ),
-        vol.Required("shift"): cv.string,
-    })
+    }
+    schema = vol.Schema({**day_fields, vol.Required("shift"): cv.string})
     for service in ("create_shift", "update_shift"):
         hass.services.async_register(
             DOMAIN, service, handle_shift, schema=schema
         )
+    hass.services.async_register(
+        DOMAIN, "delete_events", handle_shift, schema=vol.Schema(day_fields)
+    )

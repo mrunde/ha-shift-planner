@@ -21,6 +21,7 @@ from homeassistant.exceptions import (
     ServiceValidationError,
     Unauthorized,
 )
+import voluptuous as vol
 
 from custom_components.shift_planner import async_setup_entry
 from custom_components.shift_planner.config_flow import ShiftPlannerOptionsFlow
@@ -363,6 +364,150 @@ class TestShiftOperations(unittest.IsolatedAsyncioTestCase):
             **kwargs,
         )
 
+    async def test_delete_events_on_selected_day(self):
+        self.calendar.supported_features |= CalendarEntityFeature.DELETE_EVENT
+        self.calendar.async_get_events.return_value = [
+            self.cleanup_event(
+                "overnight",
+                datetime(2026, 11, 17, 22, tzinfo=timezone.utc),
+                datetime(2026, 11, 18, 6, tzinfo=timezone.utc),
+            ),
+            self.event,
+            self.cleanup_event("all-day", self.today),
+            self.cleanup_event(
+                "series", self.today, rrule="FREQ=DAILY", recurrence_id="20261118"
+            ),
+            self.cleanup_event("next-day", date(2026, 11, 19)),
+        ]
+        context = Context()
+        await self.coordinator.async_delete_events(self.today, context)
+
+        self.calendar.async_get_events.assert_awaited_once_with(
+            self.hass,
+            datetime(2026, 11, 18, tzinfo=timezone.utc),
+            datetime(2026, 11, 19, tzinfo=timezone.utc),
+        )
+        self.assertEqual(
+            [(call.args[0], call.kwargs["recurrence_id"])
+             for call in self.calendar.async_delete_event.await_args_list],
+            [("existing-event", None), ("all-day", None), ("series", "20261118")],
+        )
+        self.calendar.async_set_context.assert_called_once_with(context)
+        self.coordinator.async_request_refresh.assert_awaited_once()
+
+    async def test_delete_events_uses_local_date(self):
+        local = ZoneInfo("Europe/Berlin")
+        with patch(
+            "custom_components.shift_planner.coordinator.dt_util.DEFAULT_TIME_ZONE",
+            local,
+        ):
+            self.calendar.supported_features |= CalendarEntityFeature.DELETE_EVENT
+            self.calendar.async_get_events.return_value = [
+                self.cleanup_event(
+                    "local-day",
+                    datetime(2026, 11, 17, 23, 30, tzinfo=timezone.utc),
+                ),
+                self.cleanup_event(
+                    "previous-day",
+                    datetime(2026, 11, 17, 22, 30, tzinfo=timezone.utc),
+                ),
+            ]
+            await self.coordinator.async_delete_events(self.today, Context())
+            self.calendar.async_delete_event.assert_awaited_once_with(
+                "local-day", recurrence_id=None
+            )
+            self.assertEqual(
+                self.calendar.async_get_events.await_args.args[1:],
+                (datetime(2026, 11, 18, tzinfo=local),
+                 datetime(2026, 11, 19, tzinfo=local)),
+            )
+
+    async def test_delete_events_prevalidates_and_handles_empty_day(self):
+        self.calendar.supported_features |= CalendarEntityFeature.DELETE_EVENT
+        valid = self.cleanup_event("valid", self.today)
+        for invalid in (
+            self.cleanup_event(None, self.today),
+            self.cleanup_event("series", self.today, rrule="FREQ=DAILY"),
+        ):
+            self.calendar.async_get_events.return_value = [valid, invalid]
+            with self.assertRaises(ServiceValidationError):
+                await self.coordinator.async_delete_events(self.today, Context())
+        self.calendar.async_get_events.return_value = []
+        await self.coordinator.async_delete_events(self.today, Context())
+        self.calendar.async_delete_event.assert_not_awaited()
+        self.coordinator.async_request_refresh.assert_not_awaited()
+
+    async def test_delete_events_reports_partial_failure_and_refreshes(self):
+        self.calendar.supported_features |= CalendarEntityFeature.DELETE_EVENT
+        self.calendar.async_get_events.return_value = [
+            self.event, self.cleanup_event("second", self.today)
+        ]
+        self.calendar.async_delete_event.side_effect = [
+            None, ValueError("Write failed")
+        ]
+        with self.assertRaisesRegex(HomeAssistantError, "after deleting 1 events"):
+            await self.coordinator.async_delete_events(self.today, Context())
+        self.coordinator.async_request_refresh.assert_awaited_once()
+        self.assertFalse(self.coordinator.lock.locked())
+
+    async def test_delete_events_requires_deletable_calendar_and_valid_date(self):
+        with self.assertRaisesRegex(ServiceValidationError, "does not support"):
+            await self.coordinator.async_delete_events(self.today, Context())
+        self.hass.states.get.return_value.state = "unavailable"
+        with self.assertRaisesRegex(HomeAssistantError, "unavailable"):
+            await self.coordinator.async_delete_events(self.today, Context())
+        self.hass.states.get.return_value.state = "on"
+        self.hass.data = {}
+        with self.assertRaisesRegex(HomeAssistantError, "not loaded"):
+            await self.coordinator.async_delete_events(self.today, Context())
+        with self.assertRaisesRegex(ServiceValidationError, "out of range"):
+            await self.coordinator.async_delete_events(date.max, Context())
+        self.calendar.async_delete_event.assert_not_awaited()
+
+    async def test_delete_events_with_real_local_calendar_preserves_other_days(self):
+        calendar = Calendar(events=[
+            Event(
+                uid="daily",
+                summary="Daily shift",
+                start=datetime(2026, 11, 17, 6, 30),
+                end=datetime(2026, 11, 17, 15),
+                rrule=Recur.from_rrule("FREQ=DAILY;COUNT=3"),
+            ),
+            Event(
+                uid="overnight",
+                summary="Overnight",
+                start=datetime(2026, 11, 17, 22),
+                end=datetime(2026, 11, 18, 6),
+            ),
+            Event(
+                uid="all-day",
+                summary="All day",
+                start=self.today,
+                end=date(2026, 11, 19),
+            ),
+        ])
+        store = SimpleNamespace(async_store=AsyncMock())
+        entity = LocalCalendarEntity(store, calendar, "Shifts", "calendar-id")
+        entity.hass = self.hass
+        entity.async_update_ha_state = AsyncMock()
+        self.hass.async_add_executor_job = AsyncMock(
+            side_effect=lambda function, *args: function(*args)
+        )
+        self.hass.data[DATA_COMPONENT].get_entity.return_value = entity
+        start = datetime(2026, 11, 17, tzinfo=timezone.utc)
+        end = datetime(2026, 11, 20, tzinfo=timezone.utc)
+        before = await entity.async_get_events(self.hass, start, end)
+        expected = [event for event in before if event.start_datetime_local.date() != self.today]
+
+        await self.coordinator.async_delete_events(self.today, Context())
+
+        persisted = IcsCalendarStream.calendar_from_ics(
+            store.async_store.await_args.args[0]
+        )
+        reloaded = LocalCalendarEntity(store, persisted, "Shifts", "calendar-id")
+        reloaded.hass = self.hass
+        self.assertEqual(await reloaded.async_get_events(self.hass, start, end), expected)
+
     async def test_cleanup_deletes_all_history_by_start_not_end(self):
         self.calendar.supported_features |= CalendarEntityFeature.DELETE_EVENT
         old_events = [
@@ -659,14 +804,21 @@ class TestShiftOperations(unittest.IsolatedAsyncioTestCase):
         registrations = hass.services.async_register.call_args_list
         self.assertEqual(
             [call.args[1] for call in registrations],
-            ["create_shift", "update_shift"],
+            ["create_shift", "update_shift", "delete_events"],
         )
-        for call in registrations:
+        for call in registrations[:2]:
             schema = call.kwargs["schema"]
             data = schema({
                 "config_entry_id": "id", "date": "2026-11-18", "shift": "Night"
             })
             self.assertEqual(data["shift"], "Night")
+        schema = registrations[2].kwargs["schema"]
+        self.assertEqual(
+            schema({"config_entry_id": "id", "date": "2026-11-18"}),
+            {"config_entry_id": "id", "date": "2026-11-18"},
+        )
+        with self.assertRaises(vol.Invalid):
+            schema({"config_entry_id": "id", "date": "2026-11-18", "shift": "Night"})
 
 
 class TestShiftServices(unittest.IsolatedAsyncioTestCase):
@@ -675,6 +827,7 @@ class TestShiftServices(unittest.IsolatedAsyncioTestCase):
             calendar="calendar.shifts",
             async_create_shift=AsyncMock(),
             async_update_shift=AsyncMock(),
+            async_delete_events=AsyncMock(),
         )
         self.user = MagicMock()
         self.hass = SimpleNamespace(
@@ -698,6 +851,19 @@ class TestShiftServices(unittest.IsolatedAsyncioTestCase):
             action.assert_awaited_once_with(
                 date(2026, 11, 18), "Late", self.call.context
             )
+
+    async def test_delete_events_dispatch_and_permissions(self):
+        self.call.service = "delete_events"
+        del self.call.data["shift"]
+        await self.handler(self.call)
+        self.coordinator.async_delete_events.assert_awaited_once_with(
+            date(2026, 11, 18), self.call.context
+        )
+        self.coordinator.async_delete_events.reset_mock()
+        self.user.permissions.check_entity.return_value = False
+        with self.assertRaises(Unauthorized):
+            await self.handler(self.call)
+        self.coordinator.async_delete_events.assert_not_awaited()
 
     async def test_update_rejects_unauthorized_user(self):
         for user in (None, self.user):
